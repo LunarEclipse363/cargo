@@ -85,6 +85,25 @@ impl RepoBuilder {
         self
     }
 
+    pub fn build_with_branch(self, name: &str) -> Repository {
+        {
+            let mut index = t!(self.repo.index());
+            for file in self.files.iter() {
+                t!(index.add_path(file));
+            }
+            t!(index.write());
+            let id = t!(index.write_tree());
+            let tree = t!(self.repo.find_tree(id));
+            let sig = t!(self.repo.signature());
+            t!(self
+                .repo
+                .commit(Some("HEAD"), &sig, &sig, "Initial commit", &tree, &[]));
+        }
+        self.repo.branch(name, &self.repo.head().unwrap().peel_to_commit().unwrap(), false).unwrap();
+        let RepoBuilder { repo, .. } = self;
+        Repository(repo)
+    }
+
     /// Create the repository and commit the new files.
     pub fn build(self) -> Repository {
         {

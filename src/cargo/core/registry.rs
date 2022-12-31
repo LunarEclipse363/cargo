@@ -6,7 +6,7 @@ use crate::core::{Dependency, PackageId, QueryKind, Source, SourceId, SourceMap,
 use crate::sources::config::SourceConfigMap;
 use crate::util::errors::CargoResult;
 use crate::util::interning::InternedString;
-use crate::util::{CanonicalUrl, Config};
+use crate::util::{CanonicalUrl, Config, OptVersionReq};
 use anyhow::{bail, Context as _};
 use log::{debug, trace};
 use url::Url;
@@ -360,13 +360,17 @@ impl<'cfg> PackageRegistry<'cfg> {
                 }
 
                 if *summary.package_id().source_id().canonical_url() == canonical {
-                    return Err(anyhow::anyhow!(
-                        "patch for `{}` in `{}` points to the same source, but \
-                        patches must point to different sources",
-                        dep.package_name(),
-                        url
-                    ))
-                    .context(format!("failed to resolve patches for `{}`", url));
+                    if *orig_patch.version_req() == OptVersionReq::Any
+                        && summary.source_id().git_reference() == None
+                    {
+                        return Err(anyhow::anyhow!(
+                            "patch for `{}` in `{}` points to the same source, but \
+                            patches must point to different sources",
+                            dep.package_name(),
+                            url
+                        ))
+                        .context(format!("failed to resolve patches for `{}`", url));
+                    }
                 }
                 unlocked_summaries.push(summary);
             }

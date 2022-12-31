@@ -1365,17 +1365,6 @@ fn replace_with_crates_io() {
         .build();
 
     p.cargo("build")
-        .with_status(101)
-        .with_stderr(
-            "\
-[UPDATING] [..]
-error: failed to resolve patches for `[..]`
-
-Caused by:
-  patch for `bar` in `[..]` points to the same source, but patches must point \
-  to different sources
-",
-        )
         .run();
 }
 
@@ -2541,4 +2530,39 @@ foo v0.1.0 [..]
             &bar_oid.to_string()[..8]
         ))
         .run();
+}
+
+#[cargo_test]
+fn patch_git_different_branch() {
+    let bar = git::repo(&paths::root().join("override"))
+        .file("Cargo.toml", &basic_manifest("bar", "0.1.0"))
+        .file("src/lib.rs", "pub fn bar() {}")
+        .build_with_branch("foo");
+
+    let p = project()
+        .file(
+            "Cargo.toml",
+            &format!(
+                r#"
+                    [package]
+                    name = "foo"
+                    version = "0.0.1"
+                    authors = []
+
+                    [dependencies]
+                    bar = {{ git = '{}' }}
+
+                    [patch.'{0}']
+                    bar = {{ git = '{0}', branch = 'foo' }}
+                "#,
+                bar.url()
+            ),
+        )
+        .file(
+            "src/lib.rs",
+            "extern crate bar; pub fn foo() { bar::bar(); }",
+        )
+        .build();
+
+    p.cargo("build").run();
 }
